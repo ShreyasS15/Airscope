@@ -230,8 +230,23 @@ async function geocode(query){
   return {lat:p.latitude, lon:p.longitude, name:[p.name, p.admin1, p.country].filter(Boolean).join(", ")};
 }
 
+const km = (a,b,c,d) => { const t = Math.PI/180, R = 6371, dl = (c-a)*t, dn = (d-b)*t;
+  const h = Math.sin(dl/2)**2 + Math.cos(a*t)*Math.cos(c*t)*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+
+async function nearestStation(lat, lon){
+  for(const r of [0.25, 0.6, 1.2]){
+    const u = `https://api.waqi.info/v2/map/bounds?latlng=${lat-r},${lon-r},${lat+r},${lon+r}&networks=all&token=${CONFIG.WAQI_API_KEY}`;
+    const d = await (await fetch(u)).json();
+    if(d.status !== "ok") throw new Error(typeof d.data === "string" ? "WAQI: " + d.data : "WAQI request failed.");
+    const ok = (d.data || []).filter(s => s.aqi !== "-" && !isNaN(Number(s.aqi)));
+    if(ok.length){ ok.sort((a,b) => km(lat,lon,a.lat,a.lon) - km(lat,lon,b.lat,b.lon)); return ok[0]; }
+  }
+  throw new Error("No monitoring station found near this location.");
+}
+
 async function fromWAQI(lat, lon){
-  const r = await fetch(`https://api.waqi.info/feed/geo:${lat};${lon}/?token=${CONFIG.WAQI_API_KEY}`);
+  const st = await nearestStation(lat, lon);
+  const r = await fetch(`https://api.waqi.info/feed/@${st.uid}/?token=${CONFIG.WAQI_API_KEY}`);
   const d = await r.json();
   if(d.status !== "ok") throw new Error(typeof d.data === "string" ? "WAQI: " + d.data : "WAQI request failed.");
   const x = d.data, iaqi = x.iaqi || {};
