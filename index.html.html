@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AirScope — Live Pollution Meter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF2F1; --surface:#FFFFFF; --ink:#12222B; --muted:#5C6F78; --line:#D6DFDD; --accent:#0F6B6B;
+  --track:#E3EAE9; --shadow:0 1px 2px rgba(18,34,43,.06),0 8px 24px rgba(18,34,43,.06);
+  --aqi:#2fb36d;
+}
+:root[data-theme="dark"]{
+  --bg:#0E181E; --surface:#16252D; --ink:#E8F0EF; --muted:#8FA4AC; --line:#25383F; --accent:#4FC3B8;
+  --track:#21343C; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{font-family:'Manrope',system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;min-height:100vh;transition:background .3s,color .3s}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding:24px 20px 56px}
+
+/* header */
+header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:28px}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Fraunces',serif;font-weight:700;font-size:1.5rem;letter-spacing:-.01em}
+.brand svg{width:30px;height:30px}
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1;justify-content:flex-end}
+.search{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;flex:1;max-width:440px;min-width:240px}
+.search input{border:0;background:transparent;padding:12px 14px;flex:1;min-width:0}
+.search input:focus-visible{outline:none}
+.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:600;font-size:.9rem;box-shadow:var(--shadow);transition:transform .15s,border-color .15s}
+.btn:hover{border-color:var(--accent)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+:root[data-theme="dark"] .btn.primary{color:#07201e}
+.search .btn{border:0;border-radius:0;box-shadow:none}
+.recent{display:flex;gap:8px;flex-wrap:wrap;margin:-12px 0 20px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:4px 12px;font-size:.82rem;color:var(--muted);cursor:pointer}
+.chip:hover{color:var(--ink);border-color:var(--accent)}
+
+/* layout */
+.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:var(--shadow)}
+.card h2{font-size:.95rem;font-weight:700;margin-bottom:16px;color:var(--muted)}
+.span2{grid-column:1/-1}
+
+/* hero */
+.hero{position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(520px 260px at 20% 0%,color-mix(in srgb,var(--aqi) 22%,transparent),transparent 70%);transition:background .6s;pointer-events:none}
+.place{font-family:'Fraunces',serif;font-size:1.9rem;font-weight:700;line-height:1.15;letter-spacing:-.01em;position:relative}
+.meta{color:var(--muted);font-size:.88rem;position:relative}
+.gauge{position:relative;max-width:420px;margin:18px auto 0}
+.gauge svg{display:block;width:100%}
+.gauge .read{position:absolute;left:0;right:0;bottom:2px;text-align:center}
+.num{font-family:'Fraunces',serif;font-size:4.6rem;font-weight:700;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.cat{display:inline-block;margin-top:6px;padding:4px 14px;border-radius:999px;font-weight:700;font-size:.9rem;background:var(--aqi);color:#fff;transition:background .5s}
+.cat.dark-text{color:#2a2200}
+
+/* spectrum bar */
+.spectrum{position:relative;margin:34px 0 8px}
+.spec-bar{display:flex;height:16px;border-radius:999px;overflow:hidden}
+.spec-bar i{flex:1}
+.pointer{position:absolute;top:-9px;width:0;height:0;transform:translateX(-50%);left:0;transition:left 1s cubic-bezier(.2,.8,.2,1)}
+.pointer::after{content:"";position:absolute;left:-8px;top:0;width:16px;height:34px;border-radius:6px;background:var(--ink);border:3px solid var(--surface);box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.ticks{display:flex;justify-content:space-between;color:var(--muted);font-size:.74rem;margin-top:8px;font-variant-numeric:tabular-nums}
+
+/* pollutants */
+.pol{display:grid;gap:16px}
+.pol-row{display:grid;grid-template-columns:70px 1fr 96px;gap:12px;align-items:center}
+.pol-row b{font-size:.92rem}
+.pol-row small{display:block;color:var(--muted);font-weight:500;font-size:.72rem}
+.track{height:10px;border-radius:999px;background:var(--track);overflow:hidden}
+.fill{height:100%;width:0;border-radius:999px;transition:width 1s cubic-bezier(.2,.8,.2,1),background .4s}
+.pol-val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;font-size:.9rem}
+.pol-val small{display:inline;margin-left:2px}
+
+/* advice */
+.advice{display:grid;gap:12px}
+.advice li{list-style:none;display:flex;gap:12px;align-items:flex-start;padding:12px 14px;background:var(--bg);border-radius:12px;font-size:.92rem}
+.advice span{font-size:1.2rem;line-height:1.3}
+
+/* forecast */
+.chart{display:flex;align-items:flex-end;gap:5px;height:170px;padding-top:10px}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;position:relative}
+.bar{width:100%;border-radius:6px 6px 2px 2px;min-height:4px;transition:height .8s cubic-bezier(.2,.8,.2,1)}
+.col:hover .tip,.col:focus .tip{opacity:1}
+.tip{position:absolute;bottom:100%;margin-bottom:6px;background:var(--ink);color:var(--surface);font-size:.72rem;padding:3px 7px;border-radius:6px;opacity:0;pointer-events:none;white-space:nowrap;z-index:2}
+.lab{font-size:.66rem;color:var(--muted);margin-top:6px;height:14px;white-space:nowrap}
+
+/* weather-ish stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px;position:relative}
+.stat{padding:12px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--surface) 70%,transparent)}
+.stat small{color:var(--muted);font-size:.75rem;display:block}
+.stat b{font-size:1.05rem;font-variant-numeric:tabular-nums}
+
+/* states */
+.banner{padding:14px 16px;border-radius:14px;margin-bottom:18px;font-size:.92rem;display:none}
+.banner.show{display:block}
+.banner.err{background:#fde8e6;color:#8a1d14;border:1px solid #f3b9b3}
+.banner.info{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px solid var(--line)}
+.loading .num,.loading .place{opacity:.35}
+.skeleton{animation:pulse 1.2s infinite ease-in-out}
+@keyframes pulse{50%{opacity:.45}}
+footer{margin-top:28px;color:var(--muted);font-size:.8rem}
+@media(max-width:860px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr 1fr}.num{font-size:3.8rem}}
+@media(max-width:520px){.pol-row{grid-template-columns:56px 1fr 78px}.stats{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2.4"/><path d="M7 20c3-6 6-6 9-2s6 4 9-2" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/></svg>
+      AirScope
+    </div>
+    <div class="tools">
+      <form class="search" id="searchForm" role="search">
+        <input id="q" type="search" placeholder="Search a city, e.g. Mysuru" aria-label="Search city" autocomplete="off">
+        <button class="btn" type="submit">Search</button>
+      </form>
+      <button class="btn" id="locate" type="button">Use my location</button>
+      <button class="btn" id="theme" type="button" aria-label="Toggle dark mode">Theme</button>
+    </div>
+  </header>
+
+  <div class="recent" id="recent" aria-label="Recent searches"></div>
+  <div class="banner" id="banner" role="status"></div>
+
+  <main class="grid" id="app">
+    <section class="card hero" aria-live="polite">
+      <div class="place" id="place">—</div>
+      <div class="meta" id="meta">Search a location to see its air quality.</div>
+      <div class="gauge">
+        <svg viewBox="0 0 200 112" aria-hidden="true">
+          <path d="M10 100 A90 90 0 0 1 190 100" fill="none" stroke="var(--track)" stroke-width="14" stroke-linecap="round"/>
+          <path id="arc" d="M10 100 A90 90 0 0 1 190 100" fill="none" stroke="var(--aqi)" stroke-width="14" stroke-linecap="round" stroke-dasharray="282.74" stroke-dashoffset="282.74" style="transition:stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1),stroke .5s"/>
+        </svg>
+        <div class="read"><div class="num" id="aqi">--</div><span class="cat" id="cat">Waiting</span></div>
+      </div>
+      <div class="spectrum" role="img" aria-label="Air quality scale from good to hazardous">
+        <div class="spec-bar" id="specBar"></div>
+        <div class="pointer" id="pointer"></div>
+        <div class="ticks"><span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>300+</span></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><small>Dominant pollutant</small><b id="dom">—</b></div>
+        <div class="stat"><small>Data source</small><b id="src">—</b></div>
+        <div class="stat"><small>Last updated</small><b id="upd">—</b></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Pollutant breakdown</h2>
+      <div class="pol" id="pol"></div>
+    </section>
+
+    <section class="card">
+      <h2>What this means for you</h2>
+      <ul class="advice" id="advice"></ul>
+    </section>
+
+    <section class="card">
+      <h2 id="fcTitle">Forecast</h2>
+      <div class="chart" id="chart"></div>
+    </section>
+  </main>
+
+  <footer>AQI follows the US EPA scale. Readings are model or station estimates and are not a substitute for official advisories.
+    <button class="chip" id="refreshBtn" type="button">Refresh now</button></footer>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURATION
+   ------------------------------------------------------------
+   1) Paste your API key below. Free token: https://aqicn.org/data-platform/token/
+      - With a key  -> live monitoring-station data from WAQI
+      - Without one -> falls back to Open-Meteo (free, no key needed)
+   ============================================================ */
+const CONFIG = {
+  WAQI_API_KEY: "",              // <-- PASTE YOUR API KEY HERE
+  DEFAULT_CITY: "Bengaluru",
+  AUTO_REFRESH_MINUTES: 10
+};
+
+/* ---------- AQI scale (US EPA) ---------- */
+const LEVELS = [
+  {max:50,  name:"Good",                       color:"#2fb36d", dark:false, tips:[["🌿","Air is clean. Enjoy outdoor activity freely."],["🪟","A good time to open windows and ventilate."],["🏃","Ideal for running, cycling and sports."]]},
+  {max:100, name:"Moderate",                   color:"#e6c229", dark:true,  tips:[["🙂","Acceptable for most people."],["🫁","Unusually sensitive people should limit long outdoor exertion."],["🪟","Ventilate in the cleaner parts of the day."]]},
+  {max:150, name:"Unhealthy for sensitive groups", color:"#f08a24", dark:false, tips:[["👶","Children, older adults and people with asthma should reduce outdoor effort."],["😷","Consider a mask if you must be outside for long."],["🏠","Keep indoor activities as the main plan."]]},
+  {max:200, name:"Unhealthy",                  color:"#e0463c", dark:false, tips:[["🚫","Everyone should cut back on prolonged outdoor exertion."],["😷","Wear an N95 / FFP2 mask outdoors."],["🌀","Run an air purifier and keep windows closed."]]},
+  {max:300, name:"Very unhealthy",             color:"#9b3fb5", dark:false, tips:[["⚠️","Avoid outdoor activity where possible."],["😷","An N95 mask is strongly advised outside."],["🏥","Seek medical help for breathing difficulty."]]},
+  {max:Infinity, name:"Hazardous",              color:"#7a1f3d", dark:false, tips:[["🛑","Stay indoors with windows and doors sealed."],["🌀","Use a HEPA purifier continuously."],["🏥","Follow local emergency health advisories."]]}
+];
+const level = a => LEVELS.find(l => a <= l.max);
+
+/* Pollutants: label, full name, "high" reference (ug/m3) for the bar */
+const POLLUTANTS = {
+  pm25:{label:"PM2.5", name:"Fine particles",   limit:35},
+  pm10:{label:"PM10",  name:"Coarse particles", limit:150},
+  no2: {label:"NO₂",   name:"Nitrogen dioxide", limit:200},
+  o3:  {label:"O₃",    name:"Ozone",            limit:180},
+  so2: {label:"SO₂",   name:"Sulphur dioxide",  limit:350},
+  co:  {label:"CO",    name:"Carbon monoxide",  limit:10000}
+};
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const state = {lat:null, lon:null, name:"", timer:null};
+
+function banner(msg, type="info"){
+  const b = $("banner");
+  if(!msg){ b.className = "banner"; return; }
+  b.textContent = msg; b.className = "banner show " + type;
+}
+function setLoading(on){ $("app").classList.toggle("loading", on); }
+
+/* ---------- API layer ---------- */
+async function geocode(query){
+  const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en`);
+  if(!r.ok) throw new Error("Location search failed. Check your connection.");
+  const d = await r.json();
+  if(!d.results || !d.results.length) throw new Error(`No place found for "${query}". Try a nearby city name.`);
+  const p = d.results[0];
+  return {lat:p.latitude, lon:p.longitude, name:[p.name, p.admin1, p.country].filter(Boolean).join(", ")};
+}
+
+async function fromWAQI(lat, lon){
+  const r = await fetch(`https://api.waqi.info/feed/geo:${lat};${lon}/?token=${CONFIG.WAQI_API_KEY}`);
+  const d = await r.json();
+  if(d.status !== "ok") throw new Error(typeof d.data === "string" ? "WAQI: " + d.data : "WAQI request failed.");
+  const x = d.data, iaqi = x.iaqi || {};
+  const pollutants = {};
+  for(const k of Object.keys(POLLUTANTS)) if(iaqi[k]) pollutants[k] = {value:iaqi[k].v, unit:"AQI", limit:150};
+  const daily = (x.forecast && x.forecast.daily && x.forecast.daily.pm25) || [];
+  return {
+    aqi: Number(x.aqi), source: "WAQI station", station: x.city && x.city.name,
+    time: x.time && x.time.iso ? new Date(x.time.iso) : new Date(),
+    dominant: x.dominentpol, pollutants,
+    forecast: {title:"Daily PM2.5 outlook", items: daily.slice(0,8).map(f => ({label:f.day.slice(5), value:f.avg, hint:"avg"}))}
+  };
+}
+
+async function fromOpenMeteo(lat, lon){
+  const cur = "us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone";
+  const r = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=${cur}&hourly=us_aqi&forecast_days=3&timezone=auto`);
+  if(!r.ok) throw new Error("Air quality service is unavailable right now.");
+  const d = await r.json(), c = d.current;
+  const map = {pm25:c.pm2_5, pm10:c.pm10, no2:c.nitrogen_dioxide, o3:c.ozone, so2:c.sulphur_dioxide, co:c.carbon_monoxide};
+  const pollutants = {};
+  for(const [k,v] of Object.entries(map)) if(v != null) pollutants[k] = {value:v, unit:"µg/m³", limit:POLLUTANTS[k].limit};
+  const start = Math.max(0, d.hourly.time.findIndex(t => t >= c.time));
+  const items = [];
+  for(let i = start; i < start + 24 && i < d.hourly.time.length; i++){
+    const h = new Date(d.hourly.time[i]);
+    items.push({label: i % 3 === start % 3 ? h.getHours() + ":00" : "", value: d.hourly.us_aqi[i], hint: h.getHours() + ":00"});
+  }
+  // dominant = highest ratio to its limit
+  const dom = Object.entries(pollutants).sort((a,b) => b[1].value/b[1].limit - a[1].value/a[1].limit)[0];
+  return {aqi: c.us_aqi, source:"Open-Meteo model", time:new Date(c.time), dominant: dom && dom[0], pollutants,
+          forecast:{title:"Next 24 hours (AQI)", items}};
+}
+
+async function fetchAir(lat, lon){
+  if(CONFIG.WAQI_API_KEY){
+    try { return await fromWAQI(lat, lon); }
+    catch(e){ banner(e.message + " Showing Open-Meteo data instead.", "info"); }
+  } else {
+    banner("No API key set — showing free Open-Meteo data. Add your WAQI key in CONFIG for station readings.", "info");
+  }
+  return fromOpenMeteo(lat, lon);
+}
+
+/* ---------- rendering ---------- */
+function paintHero(aqi){
+  const L = level(aqi), root = document.documentElement;
+  root.style.setProperty("--aqi", L.color);
+  $("aqi").textContent = Math.round(aqi);
+  const cat = $("cat"); cat.textContent = L.name; cat.classList.toggle("dark-text", L.dark);
+  const frac = Math.min(aqi, 300) / 300;
+  $("arc").style.strokeDashoffset = 282.74 * (1 - frac);
+  $("pointer").style.left = (frac * 100) + "%";
+}
+
+function paintPollutants(p){
+  const rows = Object.entries(p).map(([k, v]) => {
+    const pct = Math.min(100, v.value / v.limit * 100);
+    const col = pct < 40 ? "#2fb36d" : pct < 70 ? "#e6c229" : pct < 100 ? "#f08a24" : "#e0463c";
+    return `<div class="pol-row"><div><b>${POLLUTANTS[k].label}</b><small>${POLLUTANTS[k].name}</small></div>
+      <div class="track"><div class="fill" data-w="${pct}" style="background:${col}"></div></div>
+      <div class="pol-val">${v.value < 10 ? v.value.toFixed(1) : Math.round(v.value)}<small>${v.unit}</small></div></div>`;
+  });
+  $("pol").innerHTML = rows.join("") || "<p class='meta'>No pollutant breakdown reported for this location.</p>";
+  requestAnimationFrame(() => requestAnimationFrame(() =>
+    document.querySelectorAll(".fill").forEach(f => f.style.width = f.dataset.w + "%")));
+}
+
+function paintAdvice(aqi){
+  $("advice").innerHTML = level(aqi).tips.map(t => `<li><span>${t[0]}</span><div>${t[1]}</div></li>`).join("");
+}
+
+function paintForecast(f){
+  $("fcTitle").textContent = f.title;
+  if(!f.items.length){ $("chart").innerHTML = "<p class='meta'>No forecast available for this location.</p>"; return; }
+  const max = Math.max(...f.items.map(i => i.value), 50);
+  $("chart").innerHTML = f.items.map(i =>
+    `<div class="col" tabindex="0"><div class="tip">${i.hint}: ${Math.round(i.value)}</div>
+     <div class="bar" data-h="${i.value / max * 100}" style="height:4px;background:${level(i.value).color}"></div>
+     <div class="lab">${i.label}</div></div>`).join("");
+  requestAnimationFrame(() => requestAnimationFrame(() =>
+    document.querySelectorAll(".bar").forEach(b => b.style.height = b.dataset.h + "%")));
+}
+
+function render(data, placeName){
+  $("place").textContent = data.station || placeName;
+  $("meta").textContent = `${state.lat.toFixed(2)}°, ${state.lon.toFixed(2)}°` + (data.station ? ` · near ${placeName}` : "");
+  paintHero(data.aqi);
+  paintPollutants(data.pollutants);
+  paintAdvice(data.aqi);
+  paintForecast(data.forecast);
+  $("dom").textContent = data.dominant && POLLUTANTS[data.dominant] ? POLLUTANTS[data.dominant].label : "—";
+  $("src").textContent = data.source;
+  $("upd").textContent = data.time.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+}
+
+/* ---------- controller ---------- */
+async function load(lat, lon, name){
+  state.lat = lat; state.lon = lon; state.name = name;
+  setLoading(true); banner("");
+  try{
+    const data = await fetchAir(lat, lon);
+    if(!Number.isFinite(data.aqi)) throw new Error("This location has no air quality reading yet.");
+    render(data, name);
+    clearTimeout(state.timer);
+    state.timer = setTimeout(() => load(lat, lon, name), CONFIG.AUTO_REFRESH_MINUTES * 60000);
+  }catch(e){
+    banner(e.message || "Something went wrong. Try again.", "err");
+  }finally{ setLoading(false); }
+}
+
+async function searchCity(q){
+  if(!q.trim()) return;
+  setLoading(true);
+  try{
+    const g = await geocode(q.trim());
+    saveRecent(g.name.split(",")[0]);
+    await load(g.lat, g.lon, g.name);
+  }catch(e){ banner(e.message, "err"); setLoading(false); }
+}
+
+function locate(){
+  if(!navigator.geolocation) return banner("Your browser does not support location access.", "err");
+  banner("Finding your location…");
+  navigator.geolocation.getCurrentPosition(
+    p => load(p.coords.latitude, p.coords.longitude, "Your location"),
+    () => banner("Location permission was denied. Search for a city instead.", "err"),
+    {timeout:10000});
+}
+
+/* recent searches */
+function saveRecent(n){
+  try{
+    const list = [n, ...JSON.parse(localStorage.getItem("airscope_recent") || "[]").filter(x => x !== n)].slice(0, 5);
+    localStorage.setItem("airscope_recent", JSON.stringify(list));
+  }catch(e){}
+  drawRecent();
+}
+function drawRecent(){
+  let list = [];
+  try{ list = JSON.parse(localStorage.getItem("airscope_recent") || "[]"); }catch(e){}
+  $("recent").innerHTML = list.map(c => `<button class="chip" type="button">${c}</button>`).join("");
+  $("recent").querySelectorAll(".chip").forEach(b => b.onclick = () => { $("q").value = b.textContent; searchCity(b.textContent); });
+}
+
+/* init */
+$("specBar").innerHTML = LEVELS.map(l => `<i style="background:${l.color}"></i>`).join("");
+$("searchForm").addEventListener("submit", e => { e.preventDefault(); searchCity($("q").value); });
+$("locate").onclick = locate;
+$("refreshBtn").onclick = () => state.lat != null && load(state.lat, state.lon, state.name);
+$("theme").onclick = () => {
+  const root = document.documentElement, dark = root.dataset.theme !== "dark";
+  root.dataset.theme = dark ? "dark" : "light";
+  try{ localStorage.setItem("airscope_theme", root.dataset.theme); }catch(e){}
+};
+try{
+  const t = localStorage.getItem("airscope_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = t;
+}catch(e){}
+drawRecent();
+searchCity(CONFIG.DEFAULT_CITY);
+</script>
+</body>
+</html>
